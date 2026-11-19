@@ -44,7 +44,12 @@ body {
 .board {
     position: absolute;
     inset: 0;
+    transform-origin: 50% 50%;
+    transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+.board.cam-follow { transition: transform 0.12s ease-out; }
+.board.cam-none,
+.board.no-anim { transition: none; }
 
 .mod,
 .slot,
@@ -115,9 +120,7 @@ body {
 }
 .mod.is-dragging .mod__flipper { box-shadow: var(--rove-lift-shadow), 0 0 0 3px var(--rove-rust-hi); }
 
-.board.no-anim .mod,
-.board.is-zooming .mod { transition: none; }
-.board.is-zooming .slot { animation: none; }
+.board.no-anim .mod { transition: none; }
 .table { cursor: grab; }
 body.is-panning, body.is-panning .table { cursor: grabbing; }
 .board.is-over .mod { cursor: default; }

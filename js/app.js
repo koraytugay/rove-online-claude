@@ -212,7 +212,7 @@
             (H - 2 * EDGE) / (rows * (1 / CARD_ASPECT + GAP_RATIO)),
             MAX_CARD_W
         );
-        w = Math.max(30, Math.floor(w * cam.zoom));
+        w = Math.max(60, Math.floor(w));
         var h = Math.round(w / CARD_ASPECT), gap = Math.max(4, Math.round(w * GAP_RATIO));
         board.style.setProperty('--cw', w + 'px');
         board.style.setProperty('--ch', h + 'px');
@@ -220,8 +220,19 @@
         view = {
             cx: (b.minX + b.maxX) / 2, cy: (b.minY + b.maxY) / 2,
             W: W, H: H, w: w, h: h, pitchX: w + gap, pitchY: h + gap,
-            ox: W / 2 + cam.panX, oy: H / 2 + cam.panY
+            ox: W / 2, oy: H / 2
         };
+        applyCamera();
+    }
+
+    /* Zoom and pan move the whole table as one piece (scale around the screen centre). */
+    function applyCamera() {
+        board.style.transform = 'translate(' + cam.panX + 'px,' + cam.panY + 'px) scale(' + cam.zoom + ')';
+    }
+
+    function setCameraMode(mode) {   // 'smooth' (reset), 'follow' (wheel), 'none' (panning)
+        board.classList.toggle('cam-follow', mode === 'follow');
+        board.classList.toggle('cam-none', mode === 'none');
     }
 
     function cellToPx(cell) {
@@ -479,6 +490,7 @@
             if (!ui.flow && ui.selected !== drag.id) { ui.selected = drag.id; render(); }
             drag.el.classList.add('is-dragging');
         }
+        dx /= cam.zoom; dy /= cam.zoom;
         place(drag.el, state().pos[drag.id], dx, dy);
 
         // Which slot is under the card's centre?
@@ -650,22 +662,23 @@
         if (!z || drag) return;
         var next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, cam.zoom * z.factor));
         if (next === cam.zoom) return;
-        var oldPitch = view.pitchX, oldOx = view.ox, oldOy = view.oy;
+        // keep the table point under the cursor fixed: screen = C + pan + (local - C) * zoom
+        var Cx = view.W / 2, Cy = view.H / 2;
+        var lx = Cx + (z.x - Cx - cam.panX) / cam.zoom;
+        var ly = Cy + (z.y - Cy - cam.panY) / cam.zoom;
         cam.zoom = next;
-        board.classList.add('is-zooming');
-        computeView();
-        // keep the point under the cursor fixed
-        var r = view.pitchX / oldPitch;
-        cam.panX = (z.x - (z.x - oldOx) * r) - view.W / 2;
-        cam.panY = (z.y - (z.y - oldOy) * r) - view.H / 2;
-        render();
+        cam.panX = z.x - Cx - (lx - Cx) * next;
+        cam.panY = z.y - Cy - (ly - Cy) * next;
+        setCameraMode('follow');
+        applyCamera();
         clearTimeout(zoomIdle);
-        zoomIdle = setTimeout(function () { board.classList.remove('is-zooming'); }, 150);
+        zoomIdle = setTimeout(function () { setCameraMode('smooth'); }, 200);
     }
 
     function resetCamera() {
         cam.zoom = 1; cam.panX = 0; cam.panY = 0;
-        render();
+        setCameraMode('smooth');
+        applyCamera();
     }
 
     var pan = null;
@@ -677,16 +690,16 @@
         if (!pan || e.pointerId !== pan.id) return;
         var dx = e.clientX - pan.x0, dy = e.clientY - pan.y0;
         if (!pan.active && Math.hypot(dx, dy) < PAN_THRESHOLD) return;
-        if (!pan.active) { pan.active = true; board.classList.add('is-zooming'); document.body.classList.add('is-panning'); }
+        if (!pan.active) { pan.active = true; setCameraMode('none'); document.body.classList.add('is-panning'); }
         cam.panX = pan.px + dx; cam.panY = pan.py + dy;
-        render();
+        applyCamera();
     });
     function endPan(e) {
         if (!pan || (e && e.pointerId !== pan.id)) return;
         if (pan.active) {
             suppressClick = true;
             setTimeout(function () { suppressClick = false; }, 0);
-            board.classList.remove('is-zooming');
+            setCameraMode('smooth');
             document.body.classList.remove('is-panning');
         }
         pan = null;
