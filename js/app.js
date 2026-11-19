@@ -617,11 +617,27 @@
     /* ---------- zoom (mouse wheel / trackpad pinch) and pan (drag the table) ---------- */
 
     var zoomFrame = null, zoomIdle = null, pendingZoom = null;
+    var WHEEL_DEADZONE = 40, WHEEL_GESTURE_GAP = 250, PAN_THRESHOLD = 12;
+    var wheelGesture = { sum: 0, last: 0, armed: false };
 
     window.addEventListener('wheel', function (e) {
         if (e.target.closest && e.target.closest('.hud__panel, .kt-modal')) return;
         e.preventDefault();
-        var factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
+        var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;   // lines -> pixels
+
+        // Ignore light brushes and leftover momentum: a scroll gesture only zooms once it adds up
+        // to a deliberate amount. Pinch (ctrlKey) is always deliberate.
+        var now = Date.now();
+        if (now - wheelGesture.last > WHEEL_GESTURE_GAP) { wheelGesture.sum = 0; wheelGesture.armed = false; }
+        wheelGesture.last = now;
+        if (!e.ctrlKey && !wheelGesture.armed) {
+            wheelGesture.sum += dy;
+            if (Math.abs(wheelGesture.sum) < WHEEL_DEADZONE) return;
+            wheelGesture.armed = true;
+            dy = wheelGesture.sum;
+        }
+
+        var factor = Math.exp(-dy * (e.ctrlKey ? 0.01 : 0.0015));
         pendingZoom = pendingZoom || { factor: 1, x: e.clientX, y: e.clientY };
         pendingZoom.factor *= factor;
         pendingZoom.x = e.clientX; pendingZoom.y = e.clientY;
@@ -660,7 +676,7 @@
     window.addEventListener('pointermove', function (e) {
         if (!pan || e.pointerId !== pan.id) return;
         var dx = e.clientX - pan.x0, dy = e.clientY - pan.y0;
-        if (!pan.active && Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD) return;
+        if (!pan.active && Math.hypot(dx, dy) < PAN_THRESHOLD) return;
         if (!pan.active) { pan.active = true; board.classList.add('is-zooming'); document.body.classList.add('is-panning'); }
         cam.panX = pan.px + dx; cam.panY = pan.py + dy;
         render();
