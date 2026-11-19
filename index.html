@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ROVE Tabletop</title>
+    <meta name="description" content="Module board for the solo card game ROVE: legal moves, abilities and mission tracking.">
+    <link rel="stylesheet" href="https://koraytugay.github.io/kt-styles/dist/kt.min.css">
+    <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<main class="table" id="boardArea">
+    <div class="board" id="board"></div>
+</main>
+
+<!-- Floating HUD -->
+<div class="hud" id="hud">
+    <header class="hud__panel hud__brand">
+        <div class="brand">ROVE</div>
+        <div class="mission-track">
+            <div class="pips" id="pips" aria-hidden="true"></div>
+            <div class="hud__label"><span id="missionCount">Mission 1 / 7</span></div>
+        </div>
+    </header>
+
+    <div class="hud__panel hud__tools">
+        <button class="hud-btn" id="logBtn" title="History, new game">☰ <span>Log</span></button>
+        <button class="hud-btn" id="rulesBtn" title="Rules and shortcuts (?)">?</button>
+        <button class="hud-btn" id="fullBtn" title="Fullscreen (F)" aria-label="Fullscreen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+        <button class="hud-btn" id="hideBtn" title="Hide controls (H)">H</button>
+    </div>
+
+    <div class="prompt" id="prompt" aria-live="polite"></div>
+
+    <aside class="hud__panel context" id="context"></aside>
+
+    <footer class="hud__panel hud__bar">
+        <div class="counter"><span class="counter__value" id="movesMission">0</span><span class="hud__label">Mission moves</span></div>
+        <div class="counter"><span class="counter__value" id="movesTotal">0</span><span class="hud__label">Total</span></div>
+        <button class="hud-btn hud-btn--primary" id="missionBtn">Mission 1 complete</button>
+        <button class="hud-btn" id="undoBtn" title="Undo (Z)" aria-label="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+        <button class="hud-btn" id="redoBtn" title="Redo (⇧Z)" aria-label="Redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+    </footer>
+
+    <aside class="hud__panel drawer" id="drawer" hidden>
+        <div class="drawer__head">
+            <span class="hud__label">History</span>
+            <button class="hud-btn hud-btn--quiet" id="drawerClose" aria-label="Close">✕</button>
+        </div>
+        <ol class="log__list" id="log"></ol>
+        <div class="drawer__actions">
+            <button class="hud-btn" id="newGameBtn">New game</button>
+            <button class="hud-btn hud-btn--quiet" id="giveUpBtn">Can't complete mission</button>
+        </div>
+    </aside>
+</div>
+
+<button class="hud-btn show-hud" id="showHudBtn" title="Show controls (H)" hidden>Show controls <kbd>H</kbd></button>
+
+<div class="kt-toast-stack" id="toasts"></div>
+
+<!-- Confirm / game over dialog -->
+<div class="kt-modal kt-modal--sm" id="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+    <div class="kt-modal__dialog">
+        <div class="kt-modal__header">
+            <h2 class="kt-modal__title" id="dialogTitle"></h2>
+            <button class="kt-btn kt-btn--ghost kt-btn--icon kt-modal__close" data-close aria-label="Close">✕</button>
+        </div>
+        <div class="kt-modal__body" id="dialogBody"></div>
+        <div class="kt-modal__footer" id="dialogFooter"></div>
+    </div>
+</div>
+
+<!-- Rules reference -->
+<div class="kt-modal kt-modal--lg" id="rules" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+    <div class="kt-modal__dialog">
+        <div class="kt-modal__header">
+            <h2 class="kt-modal__title" id="rulesTitle">Rules reference</h2>
+            <button class="kt-btn kt-btn--ghost kt-btn--icon kt-modal__close" data-close aria-label="Close">✕</button>
+        </div>
+        <div class="kt-modal__body kt-stack">
+            <p>Match the current mission's pattern with your modules and complete 7 missions to win. Patterns can't be rotated or flipped.
+                Play a card from your hand for its movement points (or the bigger number under its pattern if the modules already match it).
+                Unspent points are lost when you play another card or complete a mission.</p>
+
+            <h3>Movement (1 point each)</h3>
+            <p>Drag a module onto a lit-up space, or click it and then click the space.</p>
+            <div class="kt-table-wrap">
+                <table class="kt-table kt-table--compact">
+                    <thead><tr><th>Module</th><th>Arrow</th><th>Moves</th></tr></thead>
+                    <tbody id="moveTable"></tbody>
+                </table>
+            </div>
+
+            <h3>Abilities (free, once each)</h3>
+            <p>When you're not moving a module or resolving another ability, flip an active (★) module to its spent (✕) side and resolve its ability.
+                Click the ★ strip on a card, or select the module and press <kbd>A</kbd>.</p>
+            <dl class="kt-kv" id="abilityList"></dl>
+
+            <h3>After every move and ability</h3>
+            <ul class="kt-list">
+                <li>Modules never stack on each other.</li>
+                <li>They stay on the grid of the starting 2×3 layout.</li>
+                <li>They form one connected group. Touching edge-to-edge or corner-to-corner counts as adjacent.</li>
+            </ul>
+            <p class="kt-caption">The board only offers moves that follow these rules.</p>
+
+            <h3>After a mission</h3>
+            <p>Cover the old mission with the top deck card, then draw 1 card if you hold fewer than 5. If the deck runs out, flip the discard pile over without shuffling.
+                You lose if you can't complete your current mission.</p>
+
+            <h3>Shortcuts</h3>
+            <dl class="kt-kv">
+                <div class="kt-kv__row"><dt><kbd>B</kbd> <kbd>C</kbd> <kbd>G</kbd> <kbd>L</kbd> <kbd>M</kbd> <kbd>S</kbd></dt><dd>Select a module</dd></div>
+                <div class="kt-kv__row"><dt><kbd>A</kbd></dt><dd>Use the selected module's ability</dd></div>
+                <div class="kt-kv__row"><dt><kbd>Esc</kbd></dt><dd>Deselect, or cancel an ability</dd></div>
+                <div class="kt-kv__row"><dt><kbd>Z</kbd> / <kbd>⇧Z</kbd></dt><dd>Undo / redo (also <kbd>⌘Z</kbd> / <kbd>⇧⌘Z</kbd>)</dd></div>
+                <div class="kt-kv__row"><dt>Scroll / pinch</dt><dd>Zoom in and out around the pointer</dd></div>
+                <div class="kt-kv__row"><dt>Drag the table</dt><dd>Pan the view</dd></div>
+                <div class="kt-kv__row"><dt><kbd>0</kbd> / double-click the table</dt><dd>Reset zoom and position</dd></div>
+                <div class="kt-kv__row"><dt><kbd>H</kbd></dt><dd>Hide or show the controls</dd></div>
+                <div class="kt-kv__row"><dt><kbd>F</kbd></dt><dd>Fullscreen</dd></div>
+                <div class="kt-kv__row"><dt><kbd>?</kbd></dt><dd>This reference</dd></div>
+            </dl>
+        </div>
+    </div>
+</div>
+
+<script src="js/rules.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
